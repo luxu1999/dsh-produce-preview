@@ -1,0 +1,21 @@
+# @luxu1999/dsh-produce-preview bundle patch.
+#
+# Mounts the plugin row. Mounting this package as a Loader entry is what makes
+# the client-modules node half scan it for a `dsh.client` declaration, compose
+# it into window.__DSH_BOOT__, and serve its browser bundle at
+# /plugins/<package>/client.js. The host half (this package's lib/index.js)
+# registers the authorized /api/produced.file byte route.
+#
+# To install into a profile:
+#   dsh plugin --profile <name> add @luxu1999/dsh-produce-preview
+# (or add the name to dsh.profile.bundles in $DSH_HOME/profiles/<name>/package.json
+# and run `dsh plugin --profile <name> install`.)
+
+- insert:
+    - id: produce-preview
+      name: '@luxu1999/dsh-produce-preview'
+      config:
+        # Optional bounding for the served file root. Omitted fields fall back
+        # to auto-detect (first registered workspace, else process cwd).
+        maxBytes: 536870912
+        allowRange: true
