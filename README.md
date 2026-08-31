@@ -1,130 +1,97 @@
 # dsh-produce-preview
 
-A **standalone DeepSeek Harness plugin** that renders the files an agent just
-produced — images, videos, and tables — **inline in the Web chat**, so you do
-not have to dig through folders to see what DeepSeek-Harness made on your
-machine. Think of it as the "show me the output right here" experience.
+一个**独立的 DeepSeek Harness 插件**：把智能体刚生成的文件——图片、视频、表格——**直接在网页聊天里内联预览**，让你不用再去文件夹里翻找 DeepSeek-Harness 在你机器上生成的东西。这就是"输出直接显示在这里"的体验。
 
-It ships **without touching the DeepSeek-Harness codebase**: it is a normal
-DSH plugin package (a profile "bundle" with a host half and a browser/client
-half). You install it into a profile, run, and — if anything is off — you can
-uninstall it again; your Harness install is never modified.
+它**完全不改动 DeepSeek-Harness 代码本体**：是一个常规的 DSH 插件包（带宿主半与浏览器/客户端半的 profile "bundle"）。你把它装进某个 profile 运行即可；如果哪里不对，直接卸载——你的 Harness 安装永远不会被改动。
 
 ```
-  DeepSeek Harness agent runs ComfyUI / writes files
-        │  produces out/image.png, out/video.mp4, data.csv
+  DeepSeek Harness 智能体运行 ComfyUI / 写文件
+        │  产出 out/image.png、out/video.mp4、data.csv
         ▼
-  browser (this plugin's client half) ──┐
+  浏览器（本插件客户端半）──┐
         │ GET /api/produced.file?path=…   │
         ▼                                 ▼
-  host (this plugin's host half)  streams bytes with content-type + Range
+  宿主（本插件宿主半）  以 content-type + Range 流式送出字节
 ```
 
-## What it does
+## 它能做什么
 
-- **Images** (`png/jpg/jpeg/gif/webp/bmp/svg`): shown as an inline `<img>`; click
-  to open the source file with the OS.
-- **Videos** (`mp4/webm/mov/m4v`): shown as a real `<video controls>`, streamed
-  with `Accept-Ranges` so you can seek. `preload="metadata"` gives a poster
-  from the first frame.
-- **Tables** (`csv/tsv/html`): rendered as an HTML table from the byte route;
-  click to open the source.
-- It uses the same produced-file facts the stock `ui-deliverables` row uses
-  (`write`, `edit`, `str_replace_editor` mutations in a turn), so it agrees with
-  the existing "Produced" chips — it just adds the inline preview lane in
-  addition, and works even if `ui-deliverables` is composed out.
+- **图片**（`png/jpg/jpeg/gif/webp/bmp/svg`）：内嵌 `<img>` 显示；点击用系统程序打开原文件。
+- **视频**（`mp4/webm/mov/m4v`）：真实 `<video controls>`，带 `Accept-Ranges` 流式传输可拖进度条；`preload="metadata"` 用首帧当海报。
+- **表格**（`csv/tsv/html`）：从字节路由拉取并渲染成 HTML 表格；点击打开原文件。
+- 使用与内置 `ui-deliverables` 相同的"产出文件"事实（一轮中 `write`、`edit`、`str_replace_editor` 的成功变更），因此和现有的"Produced"芯片保持一致——只是**额外**加了一条内联预览通道；即使 `ui-deliverables` 被移出组合也能工作。
 
-The file bytes go through an **authorized, workspace-scoped HTTP route**
-(`/api/produced.file`), not through raw shell access. It rejects absolute paths
-and `..` escapes and confines the served path to a workspace root.
+文件字节走**授权、限定工作区**的 HTTP 路由（`/api/produced.file`），不是裸 shell 访问；拒绝绝对路径与 `..` 越界，并把服务路径限制在工作区根内。
 
-## How to install (test in isolation)
+## 如何安装（隔离测试用）
 
-This package is meant to be installed **into a DSH profile** (which provides the
-`@deepseek-ai/*` scope and cordis/react), not published to npm.
+本包用于装进 **DSH profile**（由 profile 提供 `@deepseek-ai/*` 作用域与 cordis/react），不是发布到 npm。
 
-1. Clone it somewhere on the machine that runs DSH:
+1. 在运行 DSH 的机器上克隆：
 
    ```
    git clone https://github.com/luxu1999/dsh-produce-preview.git
    cd dsh-produce-preview
-   npm install          # installs esbuild/typescript (build tooling)
-   npm run build        # produces lib/index.js and lib/client.js
+   npm install          # 安装 esbuild/typescript（构建工具）
+   npm run build        # 生成 lib/index.js 与 lib/client.js
    ```
 
-   `lib/` is also checked in, so `npm run build` is optional if you trust the
-   shipped bundle.
+   `lib/` 已签入仓库，因此若你信任随包产物，`npm run build` 可省略。
 
-2. Build a custom profile (or reuse `web`) and add the plugin:
+2. 建一个自定义 profile（或复用 `web`）并加入插件：
 
    ```
    dsh plugin --profile web add @luxu1999/dsh-produce-preview
    dsh plugin --profile web install
    ```
 
-   If you prefer a dedicated profile so you can remove it cleanly:
+   想用独立 profile 以便干净卸载：
 
    ```
-   dsh plugin --profile preview add @luxu1999/dsh-produce-preview   # or: dsh plugin --profile preview new
+   dsh plugin --profile preview add @luxu1999/dsh-produce-preview
    dsh plugin --profile preview install
    dsh --profile preview
    ```
 
-3. Because `@luxu1999/dsh-produce-preview` must be resolvable from the profile,
-   `resolveBundleDir` looks first at the dsh installation, then at the profile
-   directory. If the plugin is **not** published, `dsh plugin add` resolves it
-   from the local path you installed it to (npm link / file install into the
-   profile's `node_modules`, or `dsh plugin --profile preview add ./dsh-produce-preview`).
+3. `@luxu1999/dsh-produce-preview` 必须能被 profile 解析：`resolveBundleDir` 先从 dsh 安装解析，再从 profile 目录解析。若包**未发布**，用本地路径安装（本地 install 到 profile 的 `node_modules`，或 `dsh plugin --profile preview add ./dsh-produce-preview`）。
 
-4. Ask the agent to make an image/video/table (e.g. via ComfyUI, or just have it
-   `write` a `sample.png`/`report.csv`). The inline preview appears under the
-   closing assistant message.
+4. 让智能体生成图片/视频/表格（例如通过 ComfyUI，或直接 `write` 一个 `sample.png`/`report.csv`）。内联预览会出现在该助手消息下方。
 
-## Removing the plugin
+## 卸载插件
 
 ```
 dsh plugin --profile web remove @luxu1999/dsh-produce-preview
 ```
-(or remove the profile entirely). Your Harness core is untouched.
+（或直接删掉整个 profile）。你的 Harness 内核不受影响。
 
-## Plugin layout
+## 插件结构
 
-| Path | Role |
+| 路径 | 作用 |
 |---|---|
-| `src/index.ts` | Host half: registers `GET/HEAD /api/produced.file` |
-| `src/client/index.ts` | Browser half: registers the turn-tail preview slot |
-| `src/client/ProducedPreview.tsx` | Inline image/video/table renderer |
-| `src/client/produce-conversation.ts` | Produced-path conversation node |
-| `cordis.patch.yml` | Bundle patch that mounts the plugin row |
-| `scripts/build.mjs` | esbuild build (host ESM + closure-factory client bundle) |
+| `src/index.ts` | 宿主半：注册 `GET/HEAD /api/produced.file` |
+| `src/client/index.ts` | 浏览器半：注册 turn-tail 预览槽 |
+| `src/client/ProducedPreview.tsx` | 内联 图片/视频/表格 渲染 |
+| `src/client/produce-conversation.ts` | 产出路径会话节点 |
+| `cordis.patch.yml` | 挂载该插件行的 bundle patch |
+| `scripts/build.mjs` | esbuild 构建（宿主 ESM + 闭包工厂客户端 bundle） |
 
-## Configuration
+## 配置
 
-The host route is bounded through the plugin row's `config` (see
-`packages/bundle/web-app/cordis.patch.yml` style rows, or this package's
-`cordis.patch.yml`):
+宿主路由通过插件行的 `config` 约束（参考 `packages/bundle/web-app/cordis.patch.yml` 的行写法，或本包 `cordis.patch.yml`）：
 
-| key | default | meaning |
+| key | 默认 | 含义 |
 |---|---|---|
-| `root` | auto-detect | Absolute workspace root files are confined to. Auto = first registered workspace, else `process.cwd()`. |
-| `maxBytes` | 512 MiB | Max bytes one response may stream. |
-| `allowRange` | `true` | Enable `206`/`Range` so `<video>` can seek. |
+| `root` | 自动检测 | 服务文件被限制到的绝对工作区根。自动 = 第一个注册的 workspace，否则 `process.cwd()`。 |
+| `maxBytes` | 512 MiB | 单次响应最多流式字节。 |
+| `allowRange` | `true` | 启用 `206`/`Range` 以便 `<video>` 拖进度。 |
 
-## Known limits
+## 已知限制
 
-- **Produced-file source**: only `write`/`edit`/`str_replace_editor` success
-  calls are tracked (the DSH-native "produced files" facts). Files written by a
-  ComfyUI run *through a raw shell command* — where DeepSeek-Harness does not
-  call its own `write` tool — are **not** in that list; telling the agent to also
-  reference the output path (or write a small manifest) puts them in. A
-  future version can scan the workspace for changed media instead.
-- **`.xlsx`**: not parsed inline (browser CSV/TSV/HTML only); the file still
-  opens via the produced-file chip.
-- **Multi-workspace**: served root defaults to the first registered workspace;
-  session-scoped pinning is not yet implemented.
-- This is a **plugin**, so validation is on the runtime contract; test it in an
-  isolated profile before relying on it (that is exactly why this repo exists).
+- **产出文件来源**：只追踪 `write`/`edit`/`str_replace_editor` 的成功调用（DSH 原生的"产出文件"事实）。若是 ComfyUI **通过裸 shell 命令**落盘（DeepSeek-Harness 没有调用自己的 `write` 工具），则**不在**列表内；让智能体也引用输出路径（或写一个小的 manifest）即可纳入。后续版本可改为扫描工作区新增媒体。
+- **`.xlsx`**：不内联解析（仅浏览器端 CSV/TSV/HTML）；文件仍可通过 produced-file 芯片打开。
+- **多工作区**：服务根默认取第一个注册的 workspace；尚未实现按会话固定。
+- 这是**插件**，正确性依赖运行时契约；请先在隔离 profile 里测试再依赖它（这正是本仓库存在的原因）。
 
 ## License
 
-MIT.
+MIT。
