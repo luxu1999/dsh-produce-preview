@@ -178,8 +178,9 @@ async function serveFile(root: string, config: Config, request: Request): Promis
   if (rawPath === null || rawPath.length === 0) {
     return new Response('missing "path" query parameter', { status: 400 })
   }
-  // A relative path only: absolute paths and `..` climbs are refused up front.
-  if (isAbsolute(rawPath) || rawPath.includes('..')) {
+  // A relative path only: absolute paths and true path-segment climbs (`..`)
+  // are refused up front. Filenames that merely contain `..` (e.g. `a..b`) pass.
+  if (isAbsolute(rawPath) || rawPath.split(/[\\/]/u).includes('..')) {
     return new Response('path must be relative to the workspace root', { status: 403 })
   }
   const resolved = resolve(root, rawPath)
