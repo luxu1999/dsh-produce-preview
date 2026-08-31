@@ -24,7 +24,7 @@ import { stat } from 'node:fs/promises'
 import { isAbsolute, resolve, sep, extname } from 'node:path'
 import type { Readable } from 'node:stream'
 import type { Context } from '@deepseek-ai/cordis'
-import Schema from '@deepseek-ai/schemastery'
+import z from '@deepseek-ai/schemastery'
 
 /** Stable Cordis plugin name. */
 export const name = 'produce-preview'
@@ -48,12 +48,11 @@ export interface Config {
   readonly allowRange?: boolean
 }
 
-/** Validate and normalize plugin config. */
-export const Config: Schema<Config> = Schema.object({
-  root: Schema.string().required(false),
-  maxBytes: Schema.number().required(false).integer().min(0)
-    .default(512 * 1024 * 1024) as Schema<number>,
-  allowRange: Schema.boolean().required(false).default(true) as Schema<boolean>,
+/** Validate and normalize plugin config. Object fields are optional by default. */
+export const Config: z<Config> = z.object({
+  root: z.string(),
+  maxBytes: z.natural().default(512 * 1024 * 1024),
+  allowRange: z.boolean().default(true),
 })
 
 /** Media-type map keyed by lowercase file extension. */
